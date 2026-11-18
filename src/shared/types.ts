@@ -66,6 +66,7 @@ export interface RepoArchive {
   id: number;
   path: string;
   name: string;
+  owner: string;
   createdAt: string;
   lastOpenedAt: string;
   latest: ScanSummary | null;
@@ -114,9 +115,19 @@ export interface CodeFunctionStat {
   lines: number;
 }
 
+/** 一种语言在仓库里的占比 */
+export interface LanguageStat {
+  language: string;
+  bytes: number;
+  files: number;
+  /** 0 ~ 1 */
+  ratio: number;
+}
+
 export interface CodeReport {
   files: CodeFileStat[];
   functions: CodeFunctionStat[];
+  languages: LanguageStat[];
   summary: {
     trackedFiles: number;
     codeFiles: number;
@@ -126,4 +137,24 @@ export interface CodeReport {
     parsableFiles: number;
     durationMs: number;
   };
+}
+
+/** 远端仓库的公开信息，来自 GitHub 接口和本地 tag */
+export interface RemoteInfo {
+  platform: "github" | null;
+  owner: string;
+  repo: string;
+  webUrl: string | null;
+  description: string | null;
+  stars: number;
+  forks: number;
+  watchers: number;
+  openIssues: number;
+  openPulls: number;
+  license: string | null;
+  homepage: string | null;
+  pushedAt: string | null;
+  /** GitHub 接口是否成功，失败时只有本地 tag */
+  online: boolean;
+  tags: { name: string; date: string }[];
 }

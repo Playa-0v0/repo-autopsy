@@ -95,6 +95,21 @@ function open(): DatabaseSync {
       report_json TEXT NOT NULL,
       UNIQUE (repo_id, head)
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS analyses (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      repo_id     INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+      head        TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      markdown    TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      UNIQUE (repo_id, head, fingerprint)
+    );
   `);
 
   instance = db;
@@ -246,6 +261,7 @@ export function listArchives(): RepoArchive[] {
       id: repo.id,
       path: repo.path,
       name: repo.name,
+      owner: "",
       createdAt: repo.created_at,
       lastOpenedAt: repo.last_opened_at,
       latest: latest
@@ -299,6 +315,7 @@ export function findArchive(id: number): RepoArchive | null {
     id: repo.id,
     path: repo.path,
     name: repo.name,
+    owner: "",
     createdAt: repo.created_at,
     lastOpenedAt: repo.last_opened_at,
     latest: latest
@@ -400,4 +417,58 @@ export function saveCodeReport(repoId: number, head: string, report: CodeReport)
          report_json = excluded.report_json`,
     )
     .run(repoId, head, new Date().toISOString(), JSON.stringify(report));
+}
+
+export function getSetting(key: string): string | null {
+  const row = open().prepare("SELECT value FROM settings WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string): void {
+  open()
+    .prepare(
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+    )
+    .run(key, value);
+}
+
+export function findAnalysis(repoId: number, head: string, fingerprint: string): string | null {
+  const row = open()
+    .prepare("SELECT markdown FROM analyses WHERE repo_id = ? AND head = ? AND fingerprint = ?")
+    .get(repoId, head, fingerprint) as { markdown: string } | undefined;
+  return row ? row.markdown : null;
+}
+
+/** 不管 commit 和提示词，直接取这个仓库最近一次的分析结论 */
+export function findLatestAnalysis(
+  repoId: number,
+): { markdown: string; createdAt: string } | null {
+  const row = open()
+    .prepare(
+      `SELECT markdown, created_at FROM analyses
+       WHERE repo_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
+    )
+    .get(repoId) as { markdown: string; created_at: string } | undefined;
+
+  return row ? { markdown: row.markdown, createdAt: row.created_at } : null;
+}
+
+export function saveAnalysis(
+  repoId: number,
+  head: string,
+  fingerprint: string,
+  markdown: string,
+): void {
+  open()
+    .prepare(
+      `INSERT INTO analyses (repo_id, head, fingerprint, markdown, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (repo_id, head, fingerprint) DO UPDATE SET
+         markdown   = excluded.markdown,
+         created_at = excluded.created_at`,
+    )
+    .run(repoId, head, fingerprint, markdown, new Date().toISOString());
 }

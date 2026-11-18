@@ -3,7 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { parse } from "@babel/parser";
-import type { CodeFileStat, CodeFunctionStat, CodeReport } from "../shared/types";
+import type {
+  CodeFileStat,
+  CodeFunctionStat,
+  CodeReport,
+  LanguageStat,
+} from "../shared/types";
 
 const exec = promisify(execFile);
 
@@ -214,10 +219,18 @@ export async function scanCode(repoPath: string): Promise<CodeReport> {
   let parsedFunctions = 0;
   let parsableFiles = 0;
 
+  /** 语言占比按字节算，和 GitHub 的 Languages 条一致 */
+  const languageBytes = new Map<string, { bytes: number; files: number }>();
+
   const collected = await mapLimit(targets, 16, async (target) => {
     try {
       const full = path.join(root, target.file);
       const info = await fs.stat(full);
+
+      const bucket = languageBytes.get(target.language) ?? { bytes: 0, files: 0 };
+      bucket.bytes += info.size;
+      bucket.files += 1;
+      languageBytes.set(target.language, bucket);
 
       if (info.size > MAX_FILE_BYTES) {
         oversizedFiles += 1;
@@ -271,9 +284,20 @@ export async function scanCode(repoPath: string): Promise<CodeReport> {
   files.sort((a, b) => b.lines - a.lines || b.bytes - a.bytes);
   functions.sort((a, b) => b.lines - a.lines);
 
+  const totalBytes = [...languageBytes.values()].reduce((sum, item) => sum + item.bytes, 0);
+  const languages: LanguageStat[] = [...languageBytes.entries()]
+    .map(([language, item]) => ({
+      language,
+      bytes: item.bytes,
+      files: item.files,
+      ratio: totalBytes > 0 ? item.bytes / totalBytes : 0,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+
   return {
     files: files.slice(0, TOP_LIMIT),
     functions: functions.slice(0, TOP_LIMIT),
+    languages,
     summary: {
       trackedFiles: tracked.length,
       codeFiles: targets.length,

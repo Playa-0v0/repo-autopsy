@@ -4,18 +4,23 @@ import path from "node:path";
 import {
   findArchive,
   findCodeReport,
+  findLatestAnalysis,
   findRepoIdByPath,
   findScan,
+  getSetting,
   latestScan,
   listArchives,
   saveCodeReport,
   saveScan,
+  setSetting,
   touchRepo,
 } from "./db.ts";
 import { getAvatar } from "./avatar.ts";
+import { analyzeTechStack } from "./analyze.ts";
 import { scanCode } from "./code.ts";
 import { readHead, scanRepo } from "./git.ts";
 import { readGraph } from "./graph.ts";
+import { readRemote, readOwner } from "./remote.ts";
 
 function send(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -23,6 +28,19 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.end(payload);
+}
+
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (!text) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -88,7 +106,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       const repoId = touchRepo(abs, path.basename(abs));
       const force = url.searchParams.get("force") === "1";
       const cached = force ? null : findCodeReport(repoId, head);
-      if (cached) {
+      // 早期版本的结果没有语言占比，遇到就重扫一次
+      if (cached && Array.isArray(cached.languages)) {
         send(res, 200, cached);
         return;
       }
@@ -103,8 +122,105 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     return;
   }
 
+  if (url.pathname === "/api/remote") {
+    const repoPath = url.searchParams.get("path")?.trim();
+    if (!repoPath) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    try {
+      send(res, 200, await readRemote(repoPath));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/analysis") {
+    const repoPath = url.searchParams.get("path")?.trim();
+    if (!repoPath) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    const repoId = findRepoIdByPath(path.resolve(repoPath));
+    if (repoId === null) {
+      send(res, 200, { markdown: null, createdAt: null });
+      return;
+    }
+
+    const latest = findLatestAnalysis(repoId);
+    send(res, 200, {
+      markdown: latest?.markdown ?? null,
+      createdAt: latest?.createdAt ?? null,
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/settings") {
+    if (req.method === "POST") {
+      const body = await readJson(req);
+      const keys = ["ai.baseUrl", "ai.apiKey", "ai.model", "ai.extraPrompt"];
+      for (const key of keys) {
+        if (typeof body[key] === "string") setSetting(key, body[key] as string);
+      }
+      send(res, 200, { ok: true });
+      return;
+    }
+
+    send(res, 200, {
+      baseUrl: getSetting("ai.baseUrl") ?? "",
+      model: getSetting("ai.model") ?? "",
+      extraPrompt: getSetting("ai.extraPrompt") ?? "",
+      hasKey: Boolean(getSetting("ai.apiKey")),
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/analyze") {
+    if (req.method !== "POST") {
+      send(res, 405, { error: "这个接口要用 POST" });
+      return;
+    }
+
+    const body = await readJson(req);
+    const input = typeof body.path === "string" ? body.path.trim() : "";
+    if (!input) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    const abs = path.resolve(input);
+
+    try {
+      const head = await readHead(abs);
+      if (!head) {
+        send(res, 400, { error: `${abs} 不是一个 git 仓库，或者还没有任何提交` });
+        return;
+      }
+
+      const repoId = touchRepo(abs, path.basename(abs));
+      const markdown = await analyzeTechStack({
+        repoPath: abs,
+        repoId,
+        head,
+        force: body.force === true,
+      });
+      send(res, 200, { markdown });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
   if (url.pathname === "/api/repos") {
-    send(res, 200, listArchives());
+    const archives = await Promise.all(
+      listArchives().map(async (item) => ({ ...item, owner: await readOwner(item.path) })),
+    );
+    send(res, 200, archives);
     return;
   }
 

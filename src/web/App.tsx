@@ -4,6 +4,7 @@ import { Avatar } from "@/components/base/avatar/avatar";
 import { Button } from "@/components/base/buttons/button";
 import {
   Dropdown,
+  DropdownDivider,
   DropdownItem,
   DropdownPopover,
   DropdownTrigger,
@@ -12,12 +13,14 @@ import { SegmentedControl, SegmentedControlItem } from "@/components/base/segmen
 import { Skeleton } from "@/components/base/skeleton/skeleton";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { cx } from "@/utils/cx";
-import type { PersonStat, RepoArchive, RepoStats } from "../shared/types";
-import { avatarUrl, listArchives, openArchive, scanRepo } from "./api";
+import type { PersonStat, RemoteInfo, RepoArchive, RepoStats } from "../shared/types";
+import { avatarUrl, listArchives, loadRemote, openArchive, scanRepo } from "./api";
 import { CodeView } from "./CodeView";
 import { Heatmap, HeatmapLegend, type Metric } from "./Heatmap";
 import { GraphView } from "./GraphView";
 import { People } from "./People";
+import { RepoView } from "./RepoView";
+import { SettingsDialog } from "./SettingsDialog";
 
 const STORAGE_KEY = "gitcontribution:repo";
 const numberFormat = new Intl.NumberFormat("en-US");
@@ -116,8 +119,11 @@ export default function App() {
   const [metric, setMetric] = useState<Metric>("commits");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showBots, setShowBots] = useState(false);
-  const [mode, setMode] = useState<"contrib" | "graph" | "code">("contrib");
+  const [mode, setMode] = useState<"contrib" | "graph" | "code" | "repo">("repo");
   const [codeKey, setCodeKey] = useState(0);
+  const [remote, setRemote] = useState<RemoteInfo | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aiVersion, setAiVersion] = useState(0);
   const bootstrapped = useRef(false);
 
   async function refreshArchives() {
@@ -193,6 +199,26 @@ export default function App() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!stats) {
+      setRemote(null);
+      return;
+    }
+
+    let cancelled = false;
+    loadRemote(stats.path)
+      .then((next) => {
+        if (!cancelled) setRemote(next);
+      })
+      .catch(() => {
+        // 远端信息拿不到就不显示头像
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stats?.path]);
+
   const window = useMemo(() => (stats ? resolveWindow(stats, range) : { start: "", end: "" }), [stats, range]);
 
   const people = useMemo(() => {
@@ -256,6 +282,8 @@ export default function App() {
                   <DropdownItem onSelect={() => stats && void load(stats.path)}>
                     重新统计
                   </DropdownItem>
+                  <DropdownDivider />
+                  <DropdownItem onSelect={() => setSettingsOpen(true)}>模型设置</DropdownItem>
                 </DropdownPopover>
               </Dropdown>
               <span className="text-title-3-semibold text-text-primary">代码贡献</span>
@@ -301,6 +329,9 @@ export default function App() {
                         : "border-border-button-default bg-background-primary-default text-text-secondary hover:bg-background-secondary-hover",
                     )}
                   >
+                    {archive.owner && (
+                      <Avatar size="xs" src={avatarUrl(archive.owner, "")} alt={archive.owner} />
+                    )}
                     <span className="truncate">{archive.name}</span>
                     <span className="shrink-0 text-caption-2-regular text-text-tertiary">
                       {relativeTime(archive.latest?.scannedAt ?? archive.lastOpenedAt)}
@@ -342,6 +373,9 @@ export default function App() {
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <div className="flex items-center gap-2">
+                  {remote?.owner && (
+                    <Avatar size="xs" src={avatarUrl(remote.owner, "")} alt={remote.owner} />
+                  )}
                   <span className="text-body-medium text-text-primary">{stats.name}</span>
                   <span className="rounded-full bg-background-tertiary-default px-2 py-0.5 text-caption-2-medium text-text-secondary">
                     {stats.branch}
@@ -388,9 +422,11 @@ export default function App() {
                   selectedKeys={[mode]}
                   onSelectionChange={(keys) => {
                     const next = [...keys][0];
-                    if (next === "contrib" || next === "graph" || next === "code") setMode(next);
+                    if (next === "contrib" || next === "graph" || next === "code" || next === "repo")
+                      setMode(next);
                   }}
                 >
+                  <SegmentedControlItem id="repo">仓库画像</SegmentedControlItem>
                   <SegmentedControlItem id="contrib">贡献</SegmentedControlItem>
                   <SegmentedControlItem id="graph">提交图</SegmentedControlItem>
                   <SegmentedControlItem id="code">代码画像</SegmentedControlItem>
@@ -434,6 +470,12 @@ export default function App() {
                 <GraphView key={stats.path} repoPath={stats.path} />
               ) : mode === "code" ? (
                 <CodeView key={`${stats.path}-${codeKey}`} repoPath={stats.path} />
+              ) : mode === "repo" ? (
+                <RepoView
+                  key={`${stats.path}-${aiVersion}`}
+                  repoPath={stats.path}
+                  people={stats.people}
+                />
               ) : (
                 <>
               <section className="rounded-2xl border border-border-button-default bg-background-primary-default p-5">
@@ -508,6 +550,12 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => setAiVersion((value) => value + 1)}
+      />
     </DirectionProvider>
   );
 }
