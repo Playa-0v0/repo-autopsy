@@ -22,6 +22,7 @@ import { readHead, scanRepo } from "./git.ts";
 import { readGraph } from "./graph.ts";
 import { readRemote, readOwner } from "./remote.ts";
 import { computeScore } from "./score.ts";
+import { readStarHistory } from "./stars.ts";
 
 function send(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -132,6 +133,24 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     try {
       send(res, 200, await readRemote(repoPath));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/stars") {
+    const repoPath = url.searchParams.get("path")?.trim();
+    if (!repoPath) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    try {
+      const abs = path.resolve(repoPath);
+      const repoId = touchRepo(abs, path.basename(abs));
+      send(res, 200, await readStarHistory(abs, repoId));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       send(res, 500, { error: message });

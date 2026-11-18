@@ -192,3 +192,19 @@ export interface RemoteInfo {
   online: boolean;
   tags: { name: string; date: string }[];
 }
+
+/** 某一天的累计 star 数 */
+export interface StarPoint {
+  date: string;
+  count: number;
+}
+
+/** 从 GitHub stargazers 接口还原的 star 增长曲线 */
+export interface StarHistory {
+  available: boolean;
+  /** 拿不到时的说明，或用了缓存时的提示 */
+  reason: string | null;
+  total: number;
+  fetchedAt: string | null;
+  points: StarPoint[];
+}

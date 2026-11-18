@@ -8,7 +8,7 @@ const exec = promisify(execFile);
 const CACHE_TTL = 10 * 60 * 1000;
 const cache = new Map<string, { at: number; data: RemoteInfo }>();
 
-function parseGitHub(url: string): { owner: string; repo: string } | null {
+export function parseGitHub(url: string): { owner: string; repo: string } | null {
   const https = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
   if (https) return { owner: https[1], repo: https[2] };
 

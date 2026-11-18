@@ -2,7 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { CodeReport, DayStat, PersonStat, RepoArchive, RepoStats } from "../shared/types";
+import type {
+  CodeReport,
+  DayStat,
+  PersonStat,
+  RepoArchive,
+  RepoStats,
+  StarPoint,
+} from "../shared/types";
 
 const DATA_DIR = path.join(os.homedir(), ".gitcontribution");
 const DB_FILE = path.join(DATA_DIR, "data.db");
@@ -109,6 +116,13 @@ function open(): DatabaseSync {
       markdown    TEXT NOT NULL,
       created_at  TEXT NOT NULL,
       UNIQUE (repo_id, head, fingerprint)
+    );
+
+    CREATE TABLE IF NOT EXISTS star_history (
+      repo_id     INTEGER PRIMARY KEY REFERENCES repos(id) ON DELETE CASCADE,
+      total       INTEGER NOT NULL,
+      fetched_at  TEXT NOT NULL,
+      points_json TEXT NOT NULL
     );
   `);
 
@@ -471,4 +485,37 @@ export function saveAnalysis(
          created_at = excluded.created_at`,
     )
     .run(repoId, head, fingerprint, markdown, new Date().toISOString());
+}
+
+export interface StarHistoryRecord {
+  total: number;
+  fetchedAt: string;
+  points: StarPoint[];
+}
+
+export function findStarHistory(repoId: number): StarHistoryRecord | null {
+  const row = open()
+    .prepare("SELECT total, fetched_at, points_json FROM star_history WHERE repo_id = ?")
+    .get(repoId) as { total: number; fetched_at: string; points_json: string } | undefined;
+
+  if (!row) return null;
+
+  return {
+    total: row.total,
+    fetchedAt: row.fetched_at,
+    points: JSON.parse(row.points_json) as StarPoint[],
+  };
+}
+
+export function saveStarHistory(repoId: number, total: number, points: StarPoint[]): void {
+  open()
+    .prepare(
+      `INSERT INTO star_history (repo_id, total, fetched_at, points_json)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (repo_id) DO UPDATE SET
+         total       = excluded.total,
+         fetched_at  = excluded.fetched_at,
+         points_json = excluded.points_json`,
+    )
+    .run(repoId, total, new Date().toISOString(), JSON.stringify(points));
 }

@@ -5,6 +5,7 @@ import type {
   RepoArchive,
   RepoStats,
   ScoreReport,
+  StarHistory,
 } from "../shared/types";
 
 async function request<T>(url: string): Promise<T> {
@@ -102,6 +103,10 @@ export function loadLatestAnalysis(
 
 export function loadScore(repoPath: string): Promise<ScoreReport> {
   return request<ScoreReport>(`/api/score?path=${encodeURIComponent(repoPath)}`);
+}
+
+export function loadStarHistory(repoPath: string): Promise<StarHistory> {
+  return request<StarHistory>(`/api/stars?path=${encodeURIComponent(repoPath)}`);
 }
 
 export function saveSettings(input: Record<string, string>): Promise<{ ok: boolean }> {

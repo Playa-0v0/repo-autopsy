@@ -20,6 +20,7 @@ import { Heatmap, HeatmapLegend, type Metric } from "./Heatmap";
 import { GraphView } from "./GraphView";
 import { People } from "./People";
 import { RepoView } from "./RepoView";
+import { ScoreView } from "./ScoreView";
 import { SettingsDialog } from "./SettingsDialog";
 
 const STORAGE_KEY = "gitcontribution:repo";
@@ -119,7 +120,7 @@ export default function App() {
   const [metric, setMetric] = useState<Metric>("commits");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showBots, setShowBots] = useState(false);
-  const [mode, setMode] = useState<"contrib" | "graph" | "code" | "repo">("repo");
+  const [mode, setMode] = useState<"contrib" | "graph" | "code" | "repo" | "score">("repo");
   const [codeKey, setCodeKey] = useState(0);
   const [remote, setRemote] = useState<RemoteInfo | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -423,7 +424,13 @@ export default function App() {
                   selectedKeys={[mode]}
                   onSelectionChange={(keys) => {
                     const next = [...keys][0];
-                    if (next === "contrib" || next === "graph" || next === "code" || next === "repo")
+                    if (
+                      next === "contrib" ||
+                      next === "graph" ||
+                      next === "code" ||
+                      next === "repo" ||
+                      next === "score"
+                    )
                       setMode(next);
                   }}
                 >
@@ -431,6 +438,7 @@ export default function App() {
                   <SegmentedControlItem id="contrib">贡献</SegmentedControlItem>
                   <SegmentedControlItem id="graph">提交图</SegmentedControlItem>
                   <SegmentedControlItem id="code">代码画像</SegmentedControlItem>
+                  <SegmentedControlItem id="score">六维评分</SegmentedControlItem>
                 </SegmentedControl>
 
                 {mode === "contrib" && (
@@ -471,6 +479,8 @@ export default function App() {
                 <GraphView key={stats.path} repoPath={stats.path} />
               ) : mode === "code" ? (
                 <CodeView key={`${stats.path}-${codeKey}`} repoPath={stats.path} />
+              ) : mode === "score" ? (
+                <ScoreView key={stats.path} repoPath={stats.path} />
               ) : mode === "repo" ? (
                 <RepoView
                   key={`${stats.path}-${aiVersion}`}

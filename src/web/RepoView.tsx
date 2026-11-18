@@ -10,7 +10,7 @@ import type {
   LanguageStat,
   PersonStat,
   RemoteInfo,
-  ScoreReport,
+  StarHistory,
 } from "../shared/types";
 import {
   analyzeTechStack,
@@ -18,10 +18,10 @@ import {
   loadCode,
   loadLatestAnalysis,
   loadRemote,
-  loadScore,
   loadSettings,
+  loadStarHistory,
 } from "./api";
-import { RadarChart } from "./RadarChart";
+import { StarTrendChart } from "./StarTrend";
 
 /** 和 GitHub 语言条一致的配色 */
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -119,16 +119,17 @@ export function RepoView({ repoPath, people }: { repoPath: string; people: Perso
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [aiReady, setAiReady] = useState(false);
-  const [score, setScore] = useState<ScoreReport | null>(null);
+  const [stars, setStars] = useState<StarHistory | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadScore(repoPath)
-      .then((value) => {
-        if (!cancelled) setScore(value);
+
+    loadStarHistory(repoPath)
+      .then((next) => {
+        if (!cancelled) setStars(next);
       })
       .catch(() => {
-        // 还没扫描过就没有评分
+        // 拿不到 star 趋势不影响其他区块
       });
 
     return () => {
@@ -231,6 +232,13 @@ export function RepoView({ repoPath, people }: { repoPath: string; people: Perso
   const shownPeople = humans.slice(0, MAX_AVATARS);
   const restCount = humans.length - shownPeople.length;
 
+  const recentGain = (() => {
+    if (!stars || stars.points.length === 0) return null;
+    const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const before = [...stars.points].reverse().find((point) => point.date <= cutoff);
+    return stars.total - (before?.count ?? 0);
+  })();
+
   return (
     <div className="space-y-4">
       {remote && (
@@ -303,63 +311,41 @@ export function RepoView({ repoPath, people }: { repoPath: string; people: Perso
         </section>
       )}
 
-      {score && (
+      {stars && stars.total > 0 && (
         <section className="rounded-2xl border border-border-button-default bg-background-primary-default p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-title-3-semibold text-text-primary">六维评分</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h2 className="text-title-3-semibold text-text-primary">Star 趋势</h2>
+              {stars.fetchedAt && (
                 <span className="text-caption-2-regular text-text-tertiary">
-                  趣味指标，只在同一仓库内纵向比较
+                  更新于 {new Date(stars.fetchedAt).toLocaleString("zh-CN")}
                 </span>
-              </div>
-              <p className="mt-1 text-body-2-regular text-text-secondary">
-                {score.title} · {score.subtitle}
-              </p>
+              )}
             </div>
-            <div className="flex items-baseline gap-1">
+            <div className="flex flex-wrap items-baseline gap-2">
               <span className="text-title-1-medium tabular-nums text-text-primary">
-                {score.total}
+                {numberFormat.format(stars.total)}
               </span>
-              <span className="text-caption-2-regular text-text-tertiary">/ 100</span>
+              <span className="text-caption-2-regular text-text-tertiary">Stars</span>
+              {recentGain !== null && recentGain > 0 && (
+                <span className="rounded-full bg-background-tertiary-default px-2 py-0.5 text-caption-2-medium text-state-success-text tabular-nums">
+                  近 30 天 +{numberFormat.format(recentGain)}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-center">
-            <RadarChart dimensions={score.dimensions} />
+          {stars.available && stars.points.length >= 2 ? (
+            <StarTrendChart points={stars.points} />
+          ) : (
+            <p className="mt-3 text-body-2-regular text-text-tertiary">
+              {stars.reason ?? "还没有 star 数据"}
+            </p>
+          )}
 
-            <div className="min-w-0 flex-1 space-y-3">
-              {score.dimensions.map((dimension) => (
-                <div key={dimension.key}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-caption-1-medium text-text-primary">
-                      {dimension.label}
-                    </span>
-                    <span className="tabular-nums text-caption-1-semibold text-text-primary">
-                      {dimension.score}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-background-tertiary-default">
-                    <div
-                      className="h-full rounded-full bg-accent-500"
-                      style={{ width: `${dimension.score}%` }}
-                    />
-                  </div>
-                  <ul className="mt-1 space-y-0.5">
-                    {dimension.details.map((detail) => (
-                      <li
-                        key={detail}
-                        className="truncate text-caption-2-regular text-text-tertiary"
-                        title={detail}
-                      >
-                        {detail}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
+          {stars.reason && stars.available && stars.points.length >= 2 && (
+            <p className="mt-2 text-caption-2-regular text-text-tertiary">{stars.reason}</p>
+          )}
         </section>
       )}
 
