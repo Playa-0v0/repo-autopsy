@@ -2,12 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GitBranch, Loader2, RefreshCw } from "lucide-react";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { Button } from "@/components/base/buttons/button";
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownPopover,
+  DropdownTrigger,
+} from "@/components/base/dropdown/dropdown";
 import { SegmentedControl, SegmentedControlItem } from "@/components/base/segmented-control/segmented-control";
 import { Skeleton } from "@/components/base/skeleton/skeleton";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { cx } from "@/utils/cx";
 import type { PersonStat, RepoArchive, RepoStats } from "../shared/types";
 import { avatarUrl, listArchives, openArchive, scanRepo } from "./api";
+import { CodeView } from "./CodeView";
 import { Heatmap, HeatmapLegend, type Metric } from "./Heatmap";
 import { GraphView } from "./GraphView";
 import { People } from "./People";
@@ -109,7 +116,8 @@ export default function App() {
   const [metric, setMetric] = useState<Metric>("commits");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showBots, setShowBots] = useState(false);
-  const [mode, setMode] = useState<"contrib" | "graph">("contrib");
+  const [mode, setMode] = useState<"contrib" | "graph" | "code">("contrib");
+  const [codeKey, setCodeKey] = useState(0);
   const bootstrapped = useRef(false);
 
   async function refreshArchives() {
@@ -224,8 +232,32 @@ export default function App() {
       <div className="min-h-screen bg-background-full">
         <header className="border-b border-separator-border bg-background-primary-default">
           <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-4 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <GitBranch className="size-5 text-text-secondary" aria-hidden />
+            <div className="flex items-center gap-1.5">
+              <Dropdown>
+                <DropdownTrigger
+                  aria-label="仓库操作"
+                  className="flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-background-secondary-hover"
+                >
+                  <GitBranch className="size-4" aria-hidden />
+                </DropdownTrigger>
+                <DropdownPopover aria-label="仓库操作">
+                  <DropdownItem
+                    onSelect={() => {
+                      if (stats) {
+                        setMode("code");
+                        setCodeKey((value) => value + 1);
+                      } else if (pathInput.trim()) {
+                        void load(pathInput);
+                      }
+                    }}
+                  >
+                    扫描仓库
+                  </DropdownItem>
+                  <DropdownItem onSelect={() => stats && void load(stats.path)}>
+                    重新统计
+                  </DropdownItem>
+                </DropdownPopover>
+              </Dropdown>
               <span className="text-title-3-semibold text-text-primary">代码贡献</span>
             </div>
 
@@ -356,11 +388,12 @@ export default function App() {
                   selectedKeys={[mode]}
                   onSelectionChange={(keys) => {
                     const next = [...keys][0];
-                    if (next === "contrib" || next === "graph") setMode(next);
+                    if (next === "contrib" || next === "graph" || next === "code") setMode(next);
                   }}
                 >
                   <SegmentedControlItem id="contrib">贡献</SegmentedControlItem>
                   <SegmentedControlItem id="graph">提交图</SegmentedControlItem>
+                  <SegmentedControlItem id="code">代码画像</SegmentedControlItem>
                 </SegmentedControl>
 
                 {mode === "contrib" && (
@@ -399,6 +432,8 @@ export default function App() {
 
               {mode === "graph" ? (
                 <GraphView key={stats.path} repoPath={stats.path} />
+              ) : mode === "code" ? (
+                <CodeView key={`${stats.path}-${codeKey}`} repoPath={stats.path} />
               ) : (
                 <>
               <section className="rounded-2xl border border-border-button-default bg-background-primary-default p-5">

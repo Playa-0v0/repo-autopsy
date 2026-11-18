@@ -1,4 +1,4 @@
-import type { GraphData, RepoArchive, RepoStats } from "../shared/types";
+import type { CodeReport, GraphData, RepoArchive, RepoStats } from "../shared/types";
 
 async function request<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -44,4 +44,10 @@ export function loadGraph(
     all: allBranches ? "1" : "0",
   });
   return request<GraphData>(`/api/graph?${params.toString()}`);
+}
+
+export function loadCode(repoPath: string, force = false): Promise<CodeReport> {
+  const params = new URLSearchParams({ path: repoPath });
+  if (force) params.set("force", "1");
+  return request<CodeReport>(`/api/code?${params.toString()}`);
 }

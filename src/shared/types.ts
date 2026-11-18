@@ -94,3 +94,36 @@ export interface GraphData {
   commits: GraphCommit[];
   total: number;
 }
+
+/** 一个代码文件的行数统计 */
+export interface CodeFileStat {
+  path: string;
+  language: string;
+  lines: number;
+  bytes: number;
+  /** 体积过大、跳过了行数和函数分析 */
+  oversized: boolean;
+}
+
+/** 解析出来的一个函数 */
+export interface CodeFunctionStat {
+  file: string;
+  name: string;
+  startLine: number;
+  endLine: number;
+  lines: number;
+}
+
+export interface CodeReport {
+  files: CodeFileStat[];
+  functions: CodeFunctionStat[];
+  summary: {
+    trackedFiles: number;
+    codeFiles: number;
+    scannedFiles: number;
+    parsedFunctions: number;
+    oversizedFiles: number;
+    parsableFiles: number;
+    durationMs: number;
+  };
+}

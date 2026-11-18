@@ -3,14 +3,17 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import {
   findArchive,
+  findCodeReport,
   findRepoIdByPath,
   findScan,
   latestScan,
   listArchives,
+  saveCodeReport,
   saveScan,
   touchRepo,
 } from "./db.ts";
 import { getAvatar } from "./avatar.ts";
+import { scanCode } from "./code.ts";
 import { readHead, scanRepo } from "./git.ts";
 import { readGraph } from "./graph.ts";
 
@@ -59,6 +62,40 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     try {
       send(res, 200, await readGraph(repoPath, limit, allBranches));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/code") {
+    const repoPath = url.searchParams.get("path")?.trim();
+    if (!repoPath) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    const abs = path.resolve(repoPath);
+
+    try {
+      const head = await readHead(abs);
+      if (!head) {
+        send(res, 400, { error: `${abs} 不是一个 git 仓库，或者还没有任何提交` });
+        return;
+      }
+
+      const repoId = touchRepo(abs, path.basename(abs));
+      const force = url.searchParams.get("force") === "1";
+      const cached = force ? null : findCodeReport(repoId, head);
+      if (cached) {
+        send(res, 200, cached);
+        return;
+      }
+
+      const report = await scanCode(abs);
+      saveCodeReport(repoId, head, report);
+      send(res, 200, report);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       send(res, 500, { error: message });

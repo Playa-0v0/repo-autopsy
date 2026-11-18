@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { DayStat, PersonStat, RepoArchive, RepoStats } from "../shared/types";
+import type { CodeReport, DayStat, PersonStat, RepoArchive, RepoStats } from "../shared/types";
 
 const DATA_DIR = path.join(os.homedir(), ".gitcontribution");
 const DB_FILE = path.join(DATA_DIR, "data.db");
@@ -85,6 +85,15 @@ function open(): DatabaseSync {
       content_type TEXT,
       data         BLOB,
       fetched_at   TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS code_reports (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      repo_id     INTEGER NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+      head        TEXT NOT NULL,
+      scanned_at  TEXT NOT NULL,
+      report_json TEXT NOT NULL,
+      UNIQUE (repo_id, head)
     );
   `);
 
@@ -371,4 +380,24 @@ export function saveAvatar(record: AvatarRecord): void {
       record.data,
       record.fetchedAt,
     );
+}
+
+export function findCodeReport(repoId: number, head: string): CodeReport | null {
+  const row = open()
+    .prepare("SELECT report_json FROM code_reports WHERE repo_id = ? AND head = ?")
+    .get(repoId, head) as { report_json: string } | undefined;
+
+  return row ? (JSON.parse(row.report_json) as CodeReport) : null;
+}
+
+export function saveCodeReport(repoId: number, head: string, report: CodeReport): void {
+  open()
+    .prepare(
+      `INSERT INTO code_reports (repo_id, head, scanned_at, report_json)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (repo_id, head) DO UPDATE SET
+         scanned_at  = excluded.scanned_at,
+         report_json = excluded.report_json`,
+    )
+    .run(repoId, head, new Date().toISOString(), JSON.stringify(report));
 }
