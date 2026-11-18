@@ -286,7 +286,8 @@ export default function App() {
                   <DropdownItem onSelect={() => setSettingsOpen(true)}>模型设置</DropdownItem>
                 </DropdownPopover>
               </Dropdown>
-              <span className="text-title-3-semibold text-text-primary">代码贡献</span>
+              <img src="/icon.png" alt="" className="size-7 rounded-lg object-cover" />
+              <span className="text-title-3-semibold text-text-primary">仓库画像</span>
             </div>
 
             <form

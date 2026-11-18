@@ -1,4 +1,11 @@
-import type { CodeReport, GraphData, RemoteInfo, RepoArchive, RepoStats } from "../shared/types";
+import type {
+  CodeReport,
+  GraphData,
+  RemoteInfo,
+  RepoArchive,
+  RepoStats,
+  ScoreReport,
+} from "../shared/types";
 
 async function request<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -91,6 +98,10 @@ export function loadLatestAnalysis(
   return request<{ markdown: string | null; createdAt: string | null }>(
     `/api/analysis?path=${encodeURIComponent(repoPath)}`,
   );
+}
+
+export function loadScore(repoPath: string): Promise<ScoreReport> {
+  return request<ScoreReport>(`/api/score?path=${encodeURIComponent(repoPath)}`);
 }
 
 export function saveSettings(input: Record<string, string>): Promise<{ ok: boolean }> {

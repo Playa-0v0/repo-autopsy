@@ -21,6 +21,7 @@ import { scanCode } from "./code.ts";
 import { readHead, scanRepo } from "./git.ts";
 import { readGraph } from "./graph.ts";
 import { readRemote, readOwner } from "./remote.ts";
+import { computeScore } from "./score.ts";
 
 function send(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -131,6 +132,48 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     try {
       send(res, 200, await readRemote(repoPath));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/score") {
+    const repoPath = url.searchParams.get("path")?.trim();
+    if (!repoPath) {
+      send(res, 400, { error: "请先填一个仓库路径" });
+      return;
+    }
+
+    try {
+      const abs = path.resolve(repoPath);
+      const head = await readHead(abs);
+      if (!head) {
+        send(res, 400, { error: `${abs} 不是一个 git 仓库，或者还没有任何提交` });
+        return;
+      }
+
+      const repoId = findRepoIdByPath(abs);
+      if (repoId === null) {
+        send(res, 400, { error: "这个仓库还没有统计过，先跑一次扫描" });
+        return;
+      }
+
+      const scan = findScan(repoId, head);
+      if (!scan) {
+        send(res, 400, { error: "当前提交还没有统计过，先跑一次扫描" });
+        return;
+      }
+
+      let report = findCodeReport(repoId, head);
+      // 老缓存缺少全量指标，重新扫一遍
+      if (!report || !report.metrics || report.metrics.productionFiles === undefined) {
+        report = await scanCode(abs);
+        saveCodeReport(repoId, head, report);
+      }
+
+      send(res, 200, computeScore(abs, scan, report));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       send(res, 500, { error: message });

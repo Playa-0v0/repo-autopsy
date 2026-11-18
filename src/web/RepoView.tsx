@@ -5,8 +5,23 @@ import { CircleAlert, ExternalLink, Eye, GitFork, GitPullRequest, Star, Tag } fr
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CodeReport, LanguageStat, PersonStat, RemoteInfo } from "../shared/types";
-import { analyzeTechStack, avatarUrl, loadCode, loadLatestAnalysis, loadRemote, loadSettings } from "./api";
+import type {
+  CodeReport,
+  LanguageStat,
+  PersonStat,
+  RemoteInfo,
+  ScoreReport,
+} from "../shared/types";
+import {
+  analyzeTechStack,
+  avatarUrl,
+  loadCode,
+  loadLatestAnalysis,
+  loadRemote,
+  loadScore,
+  loadSettings,
+} from "./api";
+import { RadarChart } from "./RadarChart";
 
 /** 和 GitHub 语言条一致的配色 */
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -104,6 +119,22 @@ export function RepoView({ repoPath, people }: { repoPath: string; people: Perso
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [aiReady, setAiReady] = useState(false);
+  const [score, setScore] = useState<ScoreReport | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadScore(repoPath)
+      .then((value) => {
+        if (!cancelled) setScore(value);
+      })
+      .catch(() => {
+        // 还没扫描过就没有评分
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
 
   useEffect(() => {
     loadSettings()
@@ -269,6 +300,66 @@ export function RepoView({ repoPath, people }: { repoPath: string; people: Perso
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {score && (
+        <section className="rounded-2xl border border-border-button-default bg-background-primary-default p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-title-3-semibold text-text-primary">六维评分</h2>
+                <span className="text-caption-2-regular text-text-tertiary">
+                  趣味指标，只在同一仓库内纵向比较
+                </span>
+              </div>
+              <p className="mt-1 text-body-2-regular text-text-secondary">
+                {score.title} · {score.subtitle}
+              </p>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-title-1-medium tabular-nums text-text-primary">
+                {score.total}
+              </span>
+              <span className="text-caption-2-regular text-text-tertiary">/ 100</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-center">
+            <RadarChart dimensions={score.dimensions} />
+
+            <div className="min-w-0 flex-1 space-y-3">
+              {score.dimensions.map((dimension) => (
+                <div key={dimension.key}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-caption-1-medium text-text-primary">
+                      {dimension.label}
+                    </span>
+                    <span className="tabular-nums text-caption-1-semibold text-text-primary">
+                      {dimension.score}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-background-tertiary-default">
+                    <div
+                      className="h-full rounded-full bg-accent-500"
+                      style={{ width: `${dimension.score}%` }}
+                    />
+                  </div>
+                  <ul className="mt-1 space-y-0.5">
+                    {dimension.details.map((detail) => (
+                      <li
+                        key={detail}
+                        className="truncate text-caption-2-regular text-text-tertiary"
+                        title={detail}
+                      >
+                        {detail}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       )}
 

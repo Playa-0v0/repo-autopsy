@@ -79,6 +79,13 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MIN_FUNCTION_LINES = 30;
 const TOP_LIMIT = 40;
 
+/** 生成代码的目录或文件名特征 */
+const GENERATED_PATH = /(^|[\\/])(generated|__generated__|gen)([\\/]|$)|\.(generated|gen)\.[a-z]+$/i;
+
+/** 文件头声明由脚本生成，这类代码不参与评分 */
+const GENERATED_HEADER =
+  /@generated|auto-?generated|code generated|do not edit|do not modify|请勿手工编辑|请勿编辑|不要修改|自动生成|由\s*\S*\s*生成/i;
+
 interface AstNode {
   type: string;
   loc?: { start: { line: number }; end: { line: number } };
@@ -227,10 +234,14 @@ export async function scanCode(repoPath: string): Promise<CodeReport> {
       const full = path.join(root, target.file);
       const info = await fs.stat(full);
 
+      // 语言占比照常统计，生成代码只影响这一项
       const bucket = languageBytes.get(target.language) ?? { bytes: 0, files: 0 };
       bucket.bytes += info.size;
       bucket.files += 1;
       languageBytes.set(target.language, bucket);
+
+      // 生成代码不进榜单，也不参与可维护性评分
+      if (GENERATED_PATH.test(target.file)) return null;
 
       if (info.size > MAX_FILE_BYTES) {
         oversizedFiles += 1;
@@ -247,6 +258,8 @@ export async function scanCode(repoPath: string): Promise<CodeReport> {
       }
 
       const text = await fs.readFile(full, "utf8");
+      if (GENERATED_HEADER.test(text.slice(0, 1500))) return null;
+
       const lines = text.length === 0 ? 0 : text.split("\n").length;
       scannedFiles += 1;
 
@@ -294,10 +307,41 @@ export async function scanCode(repoPath: string): Promise<CodeReport> {
     }))
     .sort((a, b) => b.bytes - a.bytes);
 
+  // 全量统计，供六维评分使用；展示用的列表只保留 Top 40
+  const isTestFile = (file: string) =>
+    /(\.test\.|\.spec\.|__tests__|[\\/]tests?[\\/]|_test\.)/.test(file);
+
+  const totalLines = files.reduce((sum, file) => sum + file.lines, 0);
+  const productionFiles = files.filter((file) => !isTestFile(file.path));
+  const productionLines = productionFiles.reduce((sum, file) => sum + file.lines, 0);
+  const productionFunctions = functions.filter((fn) => !isTestFile(fn.file));
+
+  const longFileList = productionFiles.filter((file) => file.lines > 800);
+  const longFunctionList = productionFunctions.filter((fn) => fn.lines > 100);
+  const longestFn = productionFunctions.reduce<CodeFunctionStat | null>(
+    (best, fn) => (best === null || fn.lines > best.lines ? fn : best),
+    null,
+  );
+
+  const metrics = {
+    totalLines,
+    productionLines,
+    productionFiles: productionFiles.length,
+    productionFunctions: productionFunctions.length,
+    longFiles: longFileList.length,
+    longFileExcess: longFileList.reduce((sum, file) => sum + (file.lines - 800), 0),
+    longFunctions: longFunctionList.length,
+    longFunctionExcess: longFunctionList.reduce((sum, fn) => sum + (fn.lines - 100), 0),
+    longestFunction: longestFn
+      ? { file: longestFn.file, name: longestFn.name, lines: longestFn.lines }
+      : null,
+  };
+
   return {
     files: files.slice(0, TOP_LIMIT),
     functions: functions.slice(0, TOP_LIMIT),
     languages,
+    metrics,
     summary: {
       trackedFiles: tracked.length,
       codeFiles: targets.length,

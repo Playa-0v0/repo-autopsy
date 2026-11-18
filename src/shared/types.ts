@@ -124,10 +124,28 @@ export interface LanguageStat {
   ratio: number;
 }
 
+/** 全量代码的汇总指标，不随展示用的 Top 列表截断 */
+export interface CodeMetrics {
+  /** 所有代码文件的总行数 */
+  totalLines: number;
+  /** 排除测试文件后的总行数 */
+  productionLines: number;
+  /** 排除测试文件后的文件数 */
+  productionFiles: number;
+  /** 排除测试文件后的函数数 */
+  productionFunctions: number;
+  longFiles: number;
+  longFileExcess: number;
+  longFunctions: number;
+  longFunctionExcess: number;
+  longestFunction: { file: string; name: string; lines: number } | null;
+}
+
 export interface CodeReport {
   files: CodeFileStat[];
   functions: CodeFunctionStat[];
   languages: LanguageStat[];
+  metrics: CodeMetrics;
   summary: {
     trackedFiles: number;
     codeFiles: number;
@@ -137,6 +155,22 @@ export interface CodeReport {
     parsableFiles: number;
     durationMs: number;
   };
+}
+
+/** 六维评分的一个维度 */
+export interface ScoreDimension {
+  key: string;
+  label: string;
+  score: number;
+  details: string[];
+}
+
+/** 仓库的六维评分 */
+export interface ScoreReport {
+  total: number;
+  title: string;
+  subtitle: string;
+  dimensions: ScoreDimension[];
 }
 
 /** 远端仓库的公开信息，来自 GitHub 接口和本地 tag */
