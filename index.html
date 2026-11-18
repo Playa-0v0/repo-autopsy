@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // 先套上主题再渲染，避免深色模式闪一下白屏
+      try {
+        var saved = localStorage.getItem("gitcontribution:theme");
+        var dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        if (dark) document.documentElement.classList.add("dark");
+      } catch (error) {}
+    </script>
     <title>仓库画像</title>
   </head>
   <body>

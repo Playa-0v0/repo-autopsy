@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GitBranch, Loader2, RefreshCw } from "lucide-react";
+import { GitBranch, Loader2, Moon, RefreshCw, Sun } from "lucide-react";
 import { Avatar } from "@/components/base/avatar/avatar";
 import { Button } from "@/components/base/buttons/button";
 import {
@@ -24,7 +24,17 @@ import { ScoreView } from "./ScoreView";
 import { SettingsDialog } from "./SettingsDialog";
 
 const STORAGE_KEY = "gitcontribution:repo";
+const THEME_KEY = "gitcontribution:theme";
 const numberFormat = new Intl.NumberFormat("en-US");
+
+type Theme = "light" | "dark";
+
+/** 没手动选过就跟随系统 */
+function initialTheme(): Theme {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 type RangeKey = "3m" | "6m" | "1y" | "all";
 
@@ -125,7 +135,13 @@ export default function App() {
   const [remote, setRemote] = useState<RemoteInfo | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const bootstrapped = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   async function refreshArchives() {
     try {
@@ -308,6 +324,19 @@ export default function App() {
               <Button type="submit" size="small" disabled={loading}>
                 打开
               </Button>
+              <button
+                type="button"
+                aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+                title={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-background-secondary-hover"
+              >
+                {theme === "dark" ? (
+                  <Sun className="size-4" aria-hidden />
+                ) : (
+                  <Moon className="size-4" aria-hidden />
+                )}
+              </button>
             </form>
           </div>
         </header>

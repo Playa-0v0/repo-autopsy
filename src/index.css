@@ -23,6 +23,14 @@
   --color-diff-add: var(--color-green-400);
   --color-diff-del: var(--color-red-400);
 
+  /* 卡片和输入框的底色带一点透明度，不要整块死板的 #262626 */
+  --color-background-primary-default: color-mix(in srgb, var(--color-neutral-800) 68%, transparent);
+
+  /* BoardUI 深色下 separator 和卡片底色同为 neutral-800，细线会完全看不见 */
+  --color-separator-border: color-mix(in srgb, var(--color-white) 14%, transparent);
+  /* 热力图的空格子同理，需要一个比卡片略亮的底色 */
+  --color-chart-neutral: color-mix(in srgb, var(--color-white) 8%, transparent);
+
   --lane-1: #60a5fa;
   --lane-2: #34d399;
   --lane-3: #fbbf24;
