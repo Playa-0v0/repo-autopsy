@@ -1,0 +1,42 @@
+@import "@fontsource-variable/inter";
+@import "./styles/globals.css";
+
+:root {
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* 增删行数的颜色：加是绿，减是红，跟随明暗主题 */
+  --color-diff-add: var(--color-green-700);
+  --color-diff-del: var(--color-red-600);
+
+  /* 提交图的轨道配色，八种循环使用 */
+  --lane-1: #2563eb;
+  --lane-2: #059669;
+  --lane-3: #d97706;
+  --lane-4: #dc2626;
+  --lane-5: #7c3aed;
+  --lane-6: #0891b2;
+  --lane-7: #db2777;
+  --lane-8: #65a30d;
+}
+
+.dark {
+  --color-diff-add: var(--color-green-400);
+  --color-diff-del: var(--color-red-400);
+
+  --lane-1: #60a5fa;
+  --lane-2: #34d399;
+  --lane-3: #fbbf24;
+  --lane-4: #f87171;
+  --lane-5: #a78bfa;
+  --lane-6: #22d3ee;
+  --lane-7: #f472b6;
+  --lane-8: #a3e635;
+}
+
+.diff-add {
+  color: var(--color-diff-add);
+}
+
+.diff-del {
+  color: var(--color-diff-del);
+}

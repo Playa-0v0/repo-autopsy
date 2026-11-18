@@ -1,0 +1,96 @@
+/** 一天的产出 */
+export interface DayStat {
+  date: string;
+  commits: number;
+  added: number;
+  removed: number;
+}
+
+export type AvatarColor = "neutral" | "blue" | "lime" | "pink";
+
+/** 一个人的汇总 */
+export interface PersonStat {
+  /** 稳定标识，通常是邮箱；没有邮箱时用名字 */
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  color: AvatarColor;
+  isBot: boolean;
+  commits: number;
+  added: number;
+  removed: number;
+  activeDays: number;
+  firstDate: string;
+  lastDate: string;
+  /** 只包含有提交的日期 */
+  days: DayStat[];
+}
+
+export interface RepoStats {
+  path: string;
+  name: string;
+  branch: string;
+  head: string;
+  scannedAt: string;
+  durationMs: number;
+  cached: boolean;
+  total: {
+    commits: number;
+    added: number;
+    removed: number;
+    activeDays: number;
+    firstDate: string;
+    lastDate: string;
+  };
+  days: DayStat[];
+  people: PersonStat[];
+}
+
+/** 档案列表里展示的最新一次扫描摘要 */
+export interface ScanSummary {
+  head: string;
+  branch: string;
+  scannedAt: string;
+  commits: number;
+  added: number;
+  removed: number;
+  activeDays: number;
+  firstDate: string;
+  lastDate: string;
+  peopleCount: number;
+}
+
+/** 一个仓库的档案：绑定过就能随时回来查看 */
+export interface RepoArchive {
+  id: number;
+  path: string;
+  name: string;
+  createdAt: string;
+  lastOpenedAt: string;
+  latest: ScanSummary | null;
+}
+
+export type GraphRefType = "head" | "branch" | "tag";
+
+export interface GraphRef {
+  name: string;
+  type: GraphRefType;
+}
+
+/** 提交图上的一个节点 */
+export interface GraphCommit {
+  hash: string;
+  parents: string[];
+  author: string;
+  email: string;
+  /** Unix 秒 */
+  timestamp: number;
+  subject: string;
+  refs: GraphRef[];
+}
+
+export interface GraphData {
+  commits: GraphCommit[];
+  total: number;
+}
