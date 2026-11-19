@@ -304,7 +304,7 @@ export default function App() {
                 </DropdownPopover>
               </Dropdown>
               <img src="/icon.png" alt="" className="size-7 rounded-lg object-cover" />
-              <span className="text-title-3-semibold text-text-primary">仓库画像</span>
+              <span className="text-title-3-semibold text-text-primary">仓库解剖室</span>
             </div>
 
             <form
