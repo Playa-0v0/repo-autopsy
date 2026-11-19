@@ -113,6 +113,12 @@ export function saveSettings(input: Record<string, string>): Promise<{ ok: boole
   return postJson<{ ok: boolean }>("/api/settings", input);
 }
 
+/** 由本地服务弹系统文件夹选择器，浏览器拿不到绝对路径 */
+export async function pickFolder(): Promise<string> {
+  const result = await postJson<{ path: string }>("/api/pick-folder", {});
+  return result.path;
+}
+
 export function analyzeTechStack(
   repoPath: string,
   force = false,

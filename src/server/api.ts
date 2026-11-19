@@ -18,6 +18,7 @@ import {
 import { getAvatar } from "./avatar.ts";
 import { analyzeTechStack } from "./analyze.ts";
 import { scanCode } from "./code.ts";
+import { pickFolder } from "./dialog.ts";
 import { readHead, scanRepo } from "./git.ts";
 import { readGraph } from "./graph.ts";
 import { readRemote, readOwner } from "./remote.ts";
@@ -133,6 +134,21 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     try {
       send(res, 200, await readRemote(repoPath));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      send(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/pick-folder") {
+    if (req.method !== "POST") {
+      send(res, 405, { error: "这个接口要用 POST" });
+      return;
+    }
+
+    try {
+      send(res, 200, { path: await pickFolder() });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       send(res, 500, { error: message });

@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/base/skeleton/skeleton";
 import { DirectionProvider } from "@/components/foundations/direction/direction";
 import { cx } from "@/utils/cx";
 import type { PersonStat, RemoteInfo, RepoArchive, RepoStats } from "../shared/types";
-import { avatarUrl, listArchives, loadRemote, openArchive, scanRepo } from "./api";
+import { avatarUrl, listArchives, loadRemote, openArchive, pickFolder, scanRepo } from "./api";
 import { CodeView } from "./CodeView";
 import { Heatmap, HeatmapLegend, type Metric } from "./Heatmap";
 import { GraphView } from "./GraphView";
@@ -136,6 +136,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aiVersion, setAiVersion] = useState(0);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [picking, setPicking] = useState(false);
   const bootstrapped = useRef(false);
 
   useEffect(() => {
@@ -170,6 +171,23 @@ export default function App() {
       setStats(null);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function pickRepo() {
+    setPicking(true);
+    setError(null);
+
+    try {
+      const picked = await pickFolder();
+      if (picked) {
+        setPathInput(picked);
+        await load(picked);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "打开选择器失败");
+    } finally {
+      setPicking(false);
     }
   }
 
@@ -321,8 +339,13 @@ export default function App() {
                 spellCheck={false}
                 className="h-8 w-full max-w-[380px] min-w-0 rounded-lg border border-border-button-default bg-background-primary-default px-2.5 text-body-2-regular text-text-primary placeholder:text-text-placeholder outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
               />
-              <Button type="submit" size="small" disabled={loading}>
-                打开
+              <Button
+                type="button"
+                size="small"
+                onClick={() => void pickRepo()}
+                disabled={loading || picking}
+              >
+                {picking ? "选择中…" : "选择仓库"}
               </Button>
               <button
                 type="button"
